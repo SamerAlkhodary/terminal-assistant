@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 )
 
 type Ollama struct {
@@ -32,11 +31,11 @@ func NewOllama(ollamaUrl, ollamaModel string) LLm {
 	}
 }
 
-func (ollama Ollama) createRequest(ollamaUrl, ollamaModel, query string) (*http.Request, error) {
+func (ollama Ollama) createRequest(ollamaUrl, ollamaModel, query string, stream bool) (*http.Request, error) {
 	payload := map[string]interface{}{
 		"model":  ollamaModel,
 		"prompt": query,
-		"stream": true,
+		"stream": stream,
 	}
 
 	body, err := json.Marshal(payload)
@@ -77,9 +76,7 @@ func (ollama Ollama) handleStream(ctx context.Context, body io.ReadCloser) error
 	return nil
 }
 
-func (ollama Ollama) sendRequest(ctx context.Context, request *http.Request) error {
-	// Encode the payload to JSON
-
+func (ollama Ollama) sendStreamRequest(ctx context.Context, request *http.Request) error {
 	client := &http.Client{}
 	resp, err := client.Do(request)
 	if err != nil {
@@ -94,43 +91,63 @@ func (ollama Ollama) sendRequest(ctx context.Context, request *http.Request) err
 	return ollama.handleStream(ctx, resp.Body)
 
 }
-func (ollama Ollama) Stream(question, command string) {
+func (ollama Ollama) sendRequest(ctx context.Context, request *http.Request) (string, error) {
 
-	ollamaRawUrl := os.Getenv("OLLAMA_HOST")
-	ollamaModel := os.Getenv("OLLAMA_MODEL")
-	if ollamaRawUrl == "" {
-		ollamaRawUrl = "http://localhost:11434"
+	client := &http.Client{}
+	resp, err := client.Do(request)
+	if err != nil {
+		return "", fmt.Errorf("request failed: %w", err)
 	}
-	if ollamaModel == "" {
-		ollamaModel = "llama3.2"
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("bad status: %s, body: %s", resp.Status, string(b))
 	}
-	u, err := url.Parse(ollamaRawUrl + "/api/generate")
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	var result map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return "", err
+	}
+	responseStr, ok := result["response"].(string)
+	if !ok {
+		return "", fmt.Errorf("response field is not a string")
+	}
+	return responseStr, nil
+
+}
+
+func (ollama Ollama) Invoke(query string) (string, error) {
+	u, err := url.Parse(ollama.ollamaUrl + "/api/generate")
 	if err != nil {
 		log.Fatalf("Failed to parse Ollama URL: %v", err)
 	}
-	query := ollama.queryBuilder(question, command)
-	request, err := ollama.createRequest(u.String(), ollamaModel, query)
+	request, err := ollama.createRequest(u.String(), ollama.ollamaModel, query, false)
 	if err != nil {
 		log.Fatalf("Failed to create request: %v", err)
 	}
-	err = ollama.sendRequest(context.Background(), request)
+
+	result, err := ollama.sendRequest(context.Background(), request)
 	if err != nil {
 		log.Fatalf("Failed to send request: %v", err)
 	}
+	return result, err
 
-	// Create Ollama API client
-
-	// Print the response
 }
-func (ollama Ollama) queryBuilder(query string, command string) string {
-	if query == "" {
-		return ""
+
+func (ollama Ollama) Stream(query string) {
+	u, err := url.Parse(ollama.ollamaUrl + "/api/generate")
+	if err != nil {
+		log.Fatalf("Failed to parse Ollama URL: %v", err)
 	}
-	switch command {
-	case "command", "c":
-		return fmt.Sprintf("You are a bash command generator. Only output the exact bash command that answers the query, with no explanation, no quotes, no Markdown, and no formatting:\n\n%s", query)
-	case "question", "q":
-		return fmt.Sprintf("You are a command-line, network and dev tools helper only. Give a short,informative and structured answer to the provided question:\n\n%s", query)
+	request, err := ollama.createRequest(u.String(), ollama.ollamaModel, query, true)
+	if err != nil {
+		log.Fatalf("Failed to create request: %v", err)
 	}
-	return "Say that you are missing a specifitc command"
+	err = ollama.sendStreamRequest(context.Background(), request)
+	if err != nil {
+		log.Fatalf("Failed to send request: %v", err)
+	}
 }

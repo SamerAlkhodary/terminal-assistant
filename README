@@ -1,22 +1,18 @@
-# 🧠 BFF – Terminal Assistant CLI
+# BFF CLI
 
-`BFF` is a command-line tool that helps you generate bash commands and answer terminal-related questions using a local or remote LLM backend like [Ollama](https://ollama.com). It’s designed for developers and power users who want fast, accurate command-line assistance directly in their terminal.
+**bff** is a simple command-line interface tool designed to assist with bash commands and general queries by leveraging an AI assistant enhanced with specialized tools.
 
----
+## Features
 
-## 🚀 Features
+- Supports natural language queries to generate bash commands or answer general questions.
+- Integrates with multiple tools to extend capabilities:
+  - **Tavily**: A tool for web search and real-time information retrieval.
+  - **Command Helper**: Assists with command-line operations and bash command generation.
+- Provides built-in help and flag support.
 
-- 🧑‍💻 Generate bash commands from natural language prompts
-- 🔍 Get answers to general terminal and shell questions
-- ⚡️ Fast, streaming responses from your local or remote LLM
-- 🔧 Built with [Cobra](https://github.com/spf13/cobra) for robust CLI support
-- 🛠 Easily extensible for new commands and workflows
+## Installation
 
----
-
-## 🛠 Installation
-
-### Clone and build
+1. Clone the repository:
 
 ```bash
 git clone https://github.com/yourusername/terminal-assistant.git
@@ -32,6 +28,7 @@ source ~/.bashrc
 ```bash
 export OLLAMA_URL=http://localhost:11434
 export OLLAMA_MODEL=llama3.2
+export TAVILY_KEY= SOME_KEY
 ```
 
 ---
@@ -40,13 +37,20 @@ export OLLAMA_MODEL=llama3.2
 
 Ask a general terminal question:
 ```bash
-bff -q "How do I list all files including hidden ones?"
+bff --query "your question or command"
+# or shorthand
+bff -q "your question or command"
 ```
 
 Ask for a command suggestion:
 ```bash
-bff -c "List all .go files recursively"
+bff -q "list all files in a directory"
 ```
+Ask a general query (e.g., weather or news):
+```bash
+bff -q "Tell me about the latest Kuberentes news"
+```
+
 
 ### Flags
 
