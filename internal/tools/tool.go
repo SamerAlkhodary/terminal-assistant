@@ -1,7 +1,15 @@
 package tools
 
+type ToolParameter struct {
+	Name        string
+	Type        string
+	Description string
+	Required    bool
+	Enum        []string // Optional
+}
 type Tool interface {
 	Name() string
 	Description() string
-	Call(input string) error
+	ToolParameters() []ToolParameter
+	Call(input string) (string, error)
 }

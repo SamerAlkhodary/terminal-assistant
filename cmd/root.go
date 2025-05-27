@@ -5,8 +5,9 @@ import (
 	"os"
 	"strings"
 
+	"com.terminal-assitant/assistant/internal/agent"
+	"com.terminal-assitant/assistant/internal/exampletool"
 	"com.terminal-assitant/assistant/internal/llm"
-	"com.terminal-assitant/assistant/internal/llmtool"
 	"com.terminal-assitant/assistant/internal/tools"
 	"github.com/spf13/cobra"
 )
@@ -14,32 +15,36 @@ import (
 var (
 	query string
 )
-var assistant = llm.NewOllama(os.Getenv("OLLAMA_URL"), os.Getenv("OLLAMA_MODEL"))
-var searchTool = tools.CreateTavilyTool()
-var coomandHelperTool = tools.CreateCommandHelperTool()
-var toolsList = []tools.Tool{
-	searchTool,
-	coomandHelperTool,
-}
-var assistantWithTools, _ = llmtool.Create(assistant, toolsList)
+
+var (
+	assistant         = llm.NewOllama(os.Getenv("OLLAMA_URL"), os.Getenv("OLLAMA_MODEL"))
+	searchTool        = exampletool.CreateTavilyTool()
+	commandHelperTool = exampletool.CreateCommandHelperTool()
+	toolsList         = []tools.Tool{searchTool, commandHelperTool}
+	assistantAgent    = agent.NewAgent(assistant, toolsList)
+)
 
 var rootCmd = &cobra.Command{
 	Use:   "helper",
-	Short: "A CLI tool that help with bash commands",
-	Long:  "helper is a simple CLI to help with bash commands.\nSupports flags like --c, q and provides built-in help.",
+	Short: "A CLI tool that helps with bash commands",
+	Long:  "helper is a simple CLI to help with bash commands.\nSupports flags like --c, -q and provides built-in help.",
 	Run: func(cmd *cobra.Command, args []string) {
-
 		if query != "" {
-			handleInput(query, "q", args)
+			handleInput(query, args)
 		} else {
 			fmt.Println("Please provide a command or query using --command/-c or --query/-q flags.")
 		}
 	},
 }
 
-func handleInput(input string, flag string, args []string) {
-	input += " " + strings.Join(args, " ")
-	assistantWithTools.Stream(input)
+func handleInput(input string, args []string) {
+	fullInput := strings.TrimSpace(input + " " + strings.Join(args, " "))
+	response, err := assistantAgent.Invoke(fullInput)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	fmt.Println(response)
 }
 
 func init() {

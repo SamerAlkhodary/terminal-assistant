@@ -10,11 +10,17 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
+
+	"com.terminal-assitant/assistant/internal/llm/model"
+	"com.terminal-assitant/assistant/internal/tools"
 )
 
 type Ollama struct {
 	ollamaUrl   string
 	ollamaModel string
+	messages    []model.Message
+	tools       []tools.Tool
 }
 
 // NewOllama creates a new Ollama client with the given URL and model.
@@ -25,17 +31,58 @@ func NewOllama(ollamaUrl, ollamaModel string) LLm {
 	if ollamaModel == "" {
 		ollamaModel = "llama3.2"
 	}
-	return Ollama{
+	return &Ollama{
 		ollamaUrl:   ollamaUrl,
 		ollamaModel: ollamaModel,
+		messages:    []model.Message{},
+		tools:       []tools.Tool{},
+	}
+}
+func ToolToFunctionDef(tool tools.Tool) map[string]any {
+	// Build properties and required fields from Parameters()
+	properties := make(map[string]any)
+	required := []string{}
+	for _, param := range tool.ToolParameters() {
+		prop := map[string]any{
+			"type":        param.Type,
+			"description": param.Description,
+		}
+		if len(param.Enum) > 0 {
+			prop["enum"] = param.Enum
+		}
+		properties[param.Name] = prop
+		if param.Required {
+			required = append(required, param.Name)
+		}
+	}
+
+	// Sanitize tool name
+	name := strings.ToLower(strings.ReplaceAll(tool.Name(), " ", "_"))
+
+	return map[string]any{
+		"type": "function",
+		"function": map[string]any{
+			"name":        name,
+			"description": tool.Description(),
+			"parameters": map[string]any{
+				"type":       "object",
+				"properties": properties,
+				"required":   required,
+			},
+		},
 	}
 }
 
-func (ollama Ollama) createRequest(ollamaUrl, ollamaModel, query string, stream bool) (*http.Request, error) {
-	payload := map[string]interface{}{
-		"model":  ollamaModel,
-		"prompt": query,
-		"stream": stream,
+func (ollama *Ollama) createRequest(ollamaUrl, ollamaModel string, stream bool) (*http.Request, error) {
+	toolsDefinitions := make([]map[string]any, 0, len(ollama.tools))
+	for _, tool := range ollama.tools {
+		toolsDefinitions = append(toolsDefinitions, ToolToFunctionDef(tool))
+	}
+	payload := map[string]any{
+		"model":    ollamaModel,
+		"messages": ollama.messages,
+		"stream":   stream,
+		"tools":    toolsDefinitions,
 	}
 
 	body, err := json.Marshal(payload)
@@ -51,7 +98,7 @@ func (ollama Ollama) createRequest(ollamaUrl, ollamaModel, query string, stream 
 	req.Header.Set("Content-Type", "application/json")
 	return req, nil
 }
-func (ollama Ollama) handleStream(ctx context.Context, body io.ReadCloser) error {
+func (ollama *Ollama) handleStream(ctx context.Context, body io.ReadCloser) error {
 	scanner := bufio.NewScanner(body)
 	for scanner.Scan() {
 		line := scanner.Bytes()
@@ -76,7 +123,7 @@ func (ollama Ollama) handleStream(ctx context.Context, body io.ReadCloser) error
 	return nil
 }
 
-func (ollama Ollama) sendStreamRequest(ctx context.Context, request *http.Request) error {
+func (ollama *Ollama) sendStreamRequest(ctx context.Context, request *http.Request) error {
 	client := &http.Client{}
 	resp, err := client.Do(request)
 	if err != nil {
@@ -91,40 +138,40 @@ func (ollama Ollama) sendStreamRequest(ctx context.Context, request *http.Reques
 	return ollama.handleStream(ctx, resp.Body)
 
 }
-func (ollama Ollama) sendRequest(ctx context.Context, request *http.Request) (string, error) {
+func (ollama *Ollama) sendRequest(ctx context.Context, request *http.Request) (map[string]any, error) {
 
 	client := &http.Client{}
 	resp, err := client.Do(request)
 	if err != nil {
-		return "", fmt.Errorf("request failed: %w", err)
+		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("bad status: %s, body: %s", resp.Status, string(b))
+		return nil, fmt.Errorf("bad status: %s, body: %s", resp.Status, string(b))
 	}
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal(bodyBytes, &result); err != nil {
-		return "", err
+		return nil, err
 	}
-	responseStr, ok := result["response"].(string)
-	if !ok {
-		return "", fmt.Errorf("response field is not a string")
-	}
-	return responseStr, nil
+	return result, nil
 
 }
 
-func (ollama Ollama) Invoke(query string) (string, error) {
-	u, err := url.Parse(ollama.ollamaUrl + "/api/generate")
+func (ollama *Ollama) Invoke(query string) (map[string]any, error) {
+	u, err := url.Parse(ollama.ollamaUrl + "/api/chat")
 	if err != nil {
 		log.Fatalf("Failed to parse Ollama URL: %v", err)
 	}
-	request, err := ollama.createRequest(u.String(), ollama.ollamaModel, query, false)
+	ollama.messages = append(ollama.messages, model.Message{
+		Role:    "user",
+		Content: query,
+	})
+	request, err := ollama.createRequest(u.String(), ollama.ollamaModel, false)
 	if err != nil {
 		log.Fatalf("Failed to create request: %v", err)
 	}
@@ -133,16 +180,32 @@ func (ollama Ollama) Invoke(query string) (string, error) {
 	if err != nil {
 		log.Fatalf("Failed to send request: %v", err)
 	}
+	jsonResult, _ := json.Marshal(result)
+	ollama.messages = append(ollama.messages, model.Message{
+		Role:    "assistant",
+		Content: string(jsonResult),
+	})
 	return result, err
 
 }
+func (ollama *Ollama) BindTools(tools []tools.Tool) LLm {
+	if len(tools) == 0 {
+		return ollama
+	}
+	ollama.tools = tools
+	return ollama
+}
 
-func (ollama Ollama) Stream(query string) {
+func (ollama *Ollama) Stream(query string) {
 	u, err := url.Parse(ollama.ollamaUrl + "/api/generate")
 	if err != nil {
 		log.Fatalf("Failed to parse Ollama URL: %v", err)
 	}
-	request, err := ollama.createRequest(u.String(), ollama.ollamaModel, query, true)
+	ollama.messages = append(ollama.messages, model.Message{
+		Role:    "user",
+		Content: query,
+	})
+	request, err := ollama.createRequest(u.String(), ollama.ollamaModel, true)
 	if err != nil {
 		log.Fatalf("Failed to create request: %v", err)
 	}
@@ -150,4 +213,23 @@ func (ollama Ollama) Stream(query string) {
 	if err != nil {
 		log.Fatalf("Failed to send request: %v", err)
 	}
+}
+func (o *Ollama) Tools() []tools.Tool {
+	return o.tools
+}
+
+func (o *Ollama) ToolDescriptions() map[string]string {
+	descriptions := make(map[string]string)
+	for _, tool := range o.tools {
+		descriptions[tool.Name()] = tool.Description()
+	}
+	return descriptions
+}
+
+func (o *Ollama) ToolNames() []string {
+	names := make([]string, len(o.tools))
+	for i, tool := range o.tools {
+		names[i] = tool.Name()
+	}
+	return names
 }

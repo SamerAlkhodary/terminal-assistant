@@ -1,4 +1,4 @@
-package tools
+package exampletool
 
 import (
 	"bytes"
@@ -7,13 +7,15 @@ import (
 	"io"
 	"net/http"
 	"os"
+
+	"com.terminal-assitant/assistant/internal/tools"
 )
 
 type Tavily struct {
 	apiKey string
 }
 
-func CreateTavilyTool() Tool {
+func CreateTavilyTool() tools.Tool {
 	apiKey, _ := getAPIKey()
 	return &Tavily{
 		apiKey: apiKey,
@@ -39,23 +41,23 @@ Input should be a short search phrase or topic, for example:
 The tool returns relevant, concise information gathered from trusted online sources.`
 }
 
-func (t *Tavily) Call(input string) error {
+func (t *Tavily) Call(input string) (string, error) {
 	// Here you would implement the logic to call the Tavily API using t.ApiKey
 	// For now, we will return a placeholder response
 	payload, err := t.buildSearchPayload(input)
 	if err != nil {
 		fmt.Println("Failed to build payload:", err)
-		return err
+		return "", err
 	}
 
 	response, err := t.sendTavilyRequest(payload)
 	if err != nil {
 		fmt.Println("Failed to send request:", err)
-		return err
+		return "", err
 	}
 
-	t.handleTavilyResponse(response)
-	return nil
+	answer := t.handleTavilyResponse(response)
+	return answer, nil
 }
 
 // Helper to get the Tavily API key from the environment
@@ -69,7 +71,7 @@ func getAPIKey() (string, error) {
 
 // Helper to build the search request payload
 func (t *Tavily) buildSearchPayload(query string) ([]byte, error) {
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"query":                      query,
 		"include_answer":             true,
 		"include_raw_content":        false,
@@ -101,16 +103,21 @@ func (t *Tavily) sendTavilyRequest(payload []byte) ([]byte, error) {
 }
 
 // Helper to handle and print the response
-func (t *Tavily) handleTavilyResponse(response []byte) {
-	var result map[string]interface{}
+func (t *Tavily) handleTavilyResponse(response []byte) string {
+	var result map[string]any
 	err := json.Unmarshal(response, &result)
 	if err != nil {
 		fmt.Println("Failed to parse Tavily response:", err)
 	}
-	// Type assertion to get the "answer" as a string
-	if answer, ok := result["answer"].(string); ok {
-		fmt.Println(answer)
-
+	return result["answer"].(string)
+}
+func (t *Tavily) ToolParameters() []tools.ToolParameter {
+	return []tools.ToolParameter{
+		{
+			Name:        "input",
+			Description: "The search query to find information.",
+			Type:        "string",
+			Required:    true,
+		},
 	}
-
 }

@@ -48,7 +48,7 @@ bff -q "list all files in a directory"
 ```
 Ask a general query (e.g., weather or news):
 ```bash
-bff -q "Tell me about the latest Kuberentes news"
+bff -q "Tell me about the latest Kuberentes news?"
 ```
 
 
