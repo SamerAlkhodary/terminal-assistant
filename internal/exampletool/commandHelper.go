@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"com.terminal-assitant/assistant/internal/llm"
+	"com.terminal-assitant/assistant/internal/llm/model"
 	"com.terminal-assitant/assistant/internal/tools"
 )
 
@@ -33,7 +34,11 @@ func (t *CommandHelper) Call(input string) (string, error) {
 		"You are a bash command generator. Only output the exact bash command that answers the query, with no explanation, no quotes, no Markdown, and no formatting:\n\n%s",
 		input,
 	)
-	resp, err := llmClient.Invoke(query)
+	message := model.Message{
+		Role:    "user",
+		Content: query,
+	}
+	resp, err := llmClient.Invoke(message)
 	if err != nil {
 		return "", err
 	}

@@ -162,15 +162,12 @@ func (ollama *Ollama) sendRequest(ctx context.Context, request *http.Request) (m
 
 }
 
-func (ollama *Ollama) Invoke(query string) (map[string]any, error) {
+func (ollama *Ollama) Invoke(message model.Message) (map[string]any, error) {
 	u, err := url.Parse(ollama.ollamaUrl + "/api/chat")
 	if err != nil {
 		log.Fatalf("Failed to parse Ollama URL: %v", err)
 	}
-	ollama.messages = append(ollama.messages, model.Message{
-		Role:    "user",
-		Content: query,
-	})
+	ollama.messages = append(ollama.messages, message)
 	request, err := ollama.createRequest(u.String(), ollama.ollamaModel, false)
 	if err != nil {
 		log.Fatalf("Failed to create request: %v", err)
@@ -196,15 +193,12 @@ func (ollama *Ollama) BindTools(tools []tools.Tool) LLm {
 	return ollama
 }
 
-func (ollama *Ollama) Stream(query string) {
+func (ollama *Ollama) Stream(message model.Message) {
 	u, err := url.Parse(ollama.ollamaUrl + "/api/generate")
 	if err != nil {
 		log.Fatalf("Failed to parse Ollama URL: %v", err)
 	}
-	ollama.messages = append(ollama.messages, model.Message{
-		Role:    "user",
-		Content: query,
-	})
+	ollama.messages = append(ollama.messages, message)
 	request, err := ollama.createRequest(u.String(), ollama.ollamaModel, true)
 	if err != nil {
 		log.Fatalf("Failed to create request: %v", err)

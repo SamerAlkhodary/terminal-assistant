@@ -8,6 +8,7 @@ import (
 	"com.terminal-assitant/assistant/internal/agent"
 	"com.terminal-assitant/assistant/internal/exampletool"
 	"com.terminal-assitant/assistant/internal/llm"
+	"com.terminal-assitant/assistant/internal/llm/model"
 	"com.terminal-assitant/assistant/internal/tools"
 	"github.com/spf13/cobra"
 )
@@ -39,12 +40,16 @@ var rootCmd = &cobra.Command{
 
 func handleInput(input string, args []string) {
 	fullInput := strings.TrimSpace(input + " " + strings.Join(args, " "))
-	response, err := assistantAgent.Invoke(fullInput)
+	message := model.Message{
+		Role:    "user",
+		Content: fullInput,
+	}
+	response, err := assistantAgent.Invoke(message)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
-	fmt.Println(response)
+	fmt.Println("response:", response)
 }
 
 func init() {

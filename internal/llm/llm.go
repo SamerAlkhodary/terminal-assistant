@@ -1,10 +1,13 @@
 package llm
 
-import "com.terminal-assitant/assistant/internal/tools"
+import (
+	"com.terminal-assitant/assistant/internal/llm/model"
+	"com.terminal-assitant/assistant/internal/tools"
+)
 
 type LLm interface {
-	Stream(query string)
-	Invoke(query string) (map[string]any, error)
+	Stream(model.Message)
+	Invoke(model.Message) (map[string]any, error)
 	BindTools(tools []tools.Tool) LLm
 	Tools() []tools.Tool
 	ToolDescriptions() map[string]string
