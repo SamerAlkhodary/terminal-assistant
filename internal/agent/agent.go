@@ -18,22 +18,22 @@ func NewAgent(llm llm.LLm, tools []tools.Tool) *Agent {
 	llmWithTools := llm.BindTools(tools)
 	llm.Invoke(model.Message{
 		Role: "system",
-		Content: `You are a tool-using assistant. You can call external tools to retrieve information. Each tool has a name, description, and parameters.
+		Content: `
+You are a tool-using assistant. You can call external tools to retrieve information. Each tool has a name, description, and parameters.
 
 When a user asks a question:
-1. Extract the required parameters and call the appropriate tool.
-2. When the tool returns a result, evaluate whether it fully answers the user's request.
+1. Extract the required parameters and the tools needed to handle the question.
+2. If the question requires tools, call the correct tools with the extracted parameters.
+3. When the tool returns a result, evaluate whether it fully answers the user's request.
+IMPORTANT:
+	If the tool call result is a command or list of commands then:
+	- You MUST return only the exact string of the shell command(s).
+	- Do NOT add explanations, formatting, or any extra words.
+	- NEVER rewrite, summarize, or interpret the command.
+	- Example: if the tool returns "ls -a", you must respond with exactly: ls -a
+	If the result is not a command, respond with a short and direct answer using the result you recevied from the tool.
 
-If the tool result is a shell command or set of commands:
-- Return only the raw command(s) as plain text.
-- Do NOT add any explanations, descriptions, comments, formatting (like Markdown), or leading phrases.
-- Do NOT say "You can use the following command", "Here is the command", or similar.
-
-If the result is not a command, respond with a short and direct answer — no elaboration, examples, or tool references.
-
-If the result is incomplete, use another tool if available or say what is missing. Never guess or invent information.
-
-Respond only when the information is complete. Be concise and strictly follow output rules.`,
+Respond only when the information is complete and with the tools' responses. Be concise and strictly follow output rules.`,
 	},
 	)
 
@@ -44,24 +44,28 @@ Respond only when the information is complete. Be concise and strictly follow ou
 }
 
 func (a *Agent) Invoke(message model.Message) (string, error) {
-	ready := false
 	inputMessage := model.Message{
 		Role:    "user",
 		Content: message.Content,
 	}
 	response := model.Response{}
 	var err error
-	for !ready {
+	maxSteps := 5
+	for range maxSteps {
 		response, err = a.llm.Invoke(inputMessage)
 		if err != nil {
 			return "", err
 		}
-		tool_response, err := a.handleToolCalls(response)
-		if err != nil {
-			ready = true
+		if len(response.Message.ToolCalls) == 0 {
+			break
 		}
-		inputMessage.Content = tool_response
-		inputMessage.Role = "tool"
+		toolResponse, _ := a.handleToolCalls(response)
+		fmt.Println("toolResponse:", fmt.Sprint(toolResponse))
+
+		inputMessage = model.Message{
+			Role:    "tool",
+			Content: toolResponse,
+		}
 
 	}
 	return response.Message.Content, nil
@@ -80,7 +84,7 @@ func (a *Agent) handleToolCalls(response model.Response) (string, error) {
 				if err != nil {
 					return "", fmt.Errorf("error calling tool %s: %w", call.Function.Name, err)
 				}
-				return result, nil
+				return "tool response:" + result, nil
 			}
 		}
 

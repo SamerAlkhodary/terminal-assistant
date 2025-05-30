@@ -3,6 +3,7 @@ package exampletool
 import (
 	"fmt"
 	"os"
+	"runtime"
 
 	"com.terminal-assitant/assistant/internal/llm/model"
 	"com.terminal-assitant/assistant/internal/llm/ollama"
@@ -30,9 +31,10 @@ The tool returns suggested commands or explanations to help the user perform the
 
 func (t *CommandHelper) Call(input string) (string, error) {
 	llmClient := ollama.NewOllama(os.Getenv("OLLAMA_URL"), os.Getenv("OLLAMA_MODEL"))
+	operatingSystem := runtime.GOOS
 	query := fmt.Sprintf(
-		"You are a bash command generator. Only output the exact bash command that answers the query, with no explanation, no quotes, no Markdown, and no formatting:\n\n%s",
-		input,
+		"You are a bash command generator on %s device. Only output the exact bash command that answers the query, with no explanation, no quotes, no Markdown, and no formatting:\n\n%s",
+		operatingSystem, input,
 	)
 	message := model.Message{
 		Role:    "user",

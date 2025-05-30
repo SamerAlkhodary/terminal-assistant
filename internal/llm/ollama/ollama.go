@@ -90,7 +90,7 @@ func (ollama *Ollama) createRequest(ollamaUrl, ollamaModel string, stream bool) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
-
+	fmt.Println("request body:", string(body))
 	// Make the POST request
 	req, err := http.NewRequest("POST", ollamaUrl, bytes.NewBuffer(body))
 	if err != nil {
@@ -159,6 +159,7 @@ func (ollama *Ollama) sendRequest(ctx context.Context, request *http.Request) (m
 	if err := json.Unmarshal(bodyBytes, &response); err != nil {
 		return response, err
 	}
+	response.Message.Role = "assistant"
 	return response, nil
 
 }

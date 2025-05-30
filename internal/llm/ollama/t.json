@@ -1,0 +1,76 @@
+{
+    "messages": [
+        {
+            "role": "system",
+            "content": "\nYou are a tool-using assistant. You can call external tools to retrieve information. Each tool has a name, description, and parameters.\n\nWhen a user asks a question:\n1. Extract the required parameters and the tools needed to handle the question.\n2. If the question requires tools, call the correct tools with the extracted parameters.\n3. When the tool returns a result, evaluate whether it fully answers the user's request.\nIMPORTANT:\n\tIf the tool call result is a command or list of commands then:\n\t- You MUST return only the exact string of the shell command(s).\n\t- Do NOT add explanations, formatting, or any extra words.\n\t- NEVER rewrite, summarize, or interpret the command.\n\t- Example: if the tool returns \"ls -a\", you must respond with exactly: ls -a\n\tIf the result is not a command, respond with a short and direct answer using the result you recevied from the tool.\n\nRespond only when the information is complete and with the tools' responses. Be concise and strictly follow output rules."
+        },
+        {
+            "role": "assistant",
+            "content": ""
+        },
+        {
+            "role": "user",
+            "content": "list all files in my directory"
+        },
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {
+                    "function": {
+                        "name": "command_helper",
+                        "arguments": {
+                            "input": "List all files in my directory"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "role": "tool",
+            "content": "ls"
+        }
+    ],
+    "model": "llama3.2",
+    "stream": false,
+    "tools": [
+        {
+            "function": {
+                "description": "Tavily is a tool for answering questions that require up-to-date or web-based information.\n\nUse it whenever the user asks about:\n- Current events\n- Weather\n- Recent developments\n- Factual web search queries\n\nInput should be a short search phrase or topic, for example:\n- Latest news on AI advancements\n- Weather forecast for New York tomorrow\n- Top restaurants in San Francisco\n\nThe tool returns relevant, concise information gathered from trusted online sources.",
+                "name": "tavily",
+                "parameters": {
+                    "properties": {
+                        "input": {
+                            "description": "The search query to find information.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "input"
+                    ],
+                    "type": "object"
+                }
+            },
+            "type": "function"
+        },
+        {
+            "function": {
+                "description": "Command Helper is a tool that assists with command-line operations by generating or explaining shell commands based on user input.\nInput should be a clear, concise description or question about a command-line task, such as:\n- \"List all files modified in the last 24 hours\"\n- \"How to find large files in a directory?\"\n- \"Create a backup of my home directory using rsync\"\nThe tool returns suggested commands or explanations to help the user perform the requested task efficiently.",
+                "name": "command_helper",
+                "parameters": {
+                    "properties": {
+                        "input": {
+                            "description": "The command or query to generate or explain.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "input"
+                    ],
+                    "type": "object"
+                }
+            },
+            "type": "function"
+        }
+    ]
+}
