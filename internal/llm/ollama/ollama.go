@@ -90,7 +90,6 @@ func (ollama *Ollama) createRequest(ollamaUrl, ollamaModel string, stream bool) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
-	fmt.Println("request body:", string(body))
 	// Make the POST request
 	req, err := http.NewRequest("POST", ollamaUrl, bytes.NewBuffer(body))
 	if err != nil {
