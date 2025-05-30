@@ -60,7 +60,6 @@ func (a *Agent) Invoke(message model.Message) (string, error) {
 			break
 		}
 		toolResponse, _ := a.handleToolCalls(response)
-		fmt.Println("toolResponse:", fmt.Sprint(toolResponse))
 
 		inputMessage = model.Message{
 			Role:    "tool",
