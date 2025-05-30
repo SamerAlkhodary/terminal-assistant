@@ -7,8 +7,8 @@ import (
 
 	"com.terminal-assitant/assistant/internal/agent"
 	"com.terminal-assitant/assistant/internal/exampletool"
-	"com.terminal-assitant/assistant/internal/llm"
 	"com.terminal-assitant/assistant/internal/llm/model"
+	"com.terminal-assitant/assistant/internal/llm/ollama"
 	"com.terminal-assitant/assistant/internal/tools"
 	"github.com/spf13/cobra"
 )
@@ -18,7 +18,7 @@ var (
 )
 
 var (
-	assistant         = llm.NewOllama(os.Getenv("OLLAMA_URL"), os.Getenv("OLLAMA_MODEL"))
+	assistant         = ollama.NewOllama(os.Getenv("OLLAMA_URL"), os.Getenv("OLLAMA_MODEL"))
 	searchTool        = exampletool.CreateTavilyTool()
 	commandHelperTool = exampletool.CreateCommandHelperTool()
 	toolsList         = []tools.Tool{searchTool, commandHelperTool}

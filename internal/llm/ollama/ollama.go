@@ -1,4 +1,4 @@
-package llm
+package ollama
 
 import (
 	"bufio"
@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strings"
 
+	"com.terminal-assitant/assistant/internal/llm"
 	"com.terminal-assitant/assistant/internal/llm/model"
 	"com.terminal-assitant/assistant/internal/tools"
 )
@@ -24,7 +25,7 @@ type Ollama struct {
 }
 
 // NewOllama creates a new Ollama client with the given URL and model.
-func NewOllama(ollamaUrl, ollamaModel string) LLm {
+func NewOllama(ollamaUrl, ollamaModel string) llm.LLm {
 	if ollamaUrl == "" {
 		ollamaUrl = "http://localhost:11434"
 	}
@@ -138,31 +139,31 @@ func (ollama *Ollama) sendStreamRequest(ctx context.Context, request *http.Reque
 	return ollama.handleStream(ctx, resp.Body)
 
 }
-func (ollama *Ollama) sendRequest(ctx context.Context, request *http.Request) (map[string]any, error) {
+func (ollama *Ollama) sendRequest(ctx context.Context, request *http.Request) (model.Response, error) {
 
 	client := &http.Client{}
 	resp, err := client.Do(request)
+	response := model.Response{}
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return response, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("bad status: %s, body: %s", resp.Status, string(b))
+		return response, fmt.Errorf("bad status: %s, body: %s", resp.Status, string(b))
 	}
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return response, err
 	}
-	var result map[string]any
-	if err := json.Unmarshal(bodyBytes, &result); err != nil {
-		return nil, err
+	if err := json.Unmarshal(bodyBytes, &response); err != nil {
+		return response, err
 	}
-	return result, nil
+	return response, nil
 
 }
 
-func (ollama *Ollama) Invoke(message model.Message) (map[string]any, error) {
+func (ollama *Ollama) Invoke(message model.Message) (model.Response, error) {
 	u, err := url.Parse(ollama.ollamaUrl + "/api/chat")
 	if err != nil {
 		log.Fatalf("Failed to parse Ollama URL: %v", err)
@@ -177,15 +178,11 @@ func (ollama *Ollama) Invoke(message model.Message) (map[string]any, error) {
 	if err != nil {
 		log.Fatalf("Failed to send request: %v", err)
 	}
-	jsonResult, _ := json.Marshal(result)
-	ollama.messages = append(ollama.messages, model.Message{
-		Role:    "assistant",
-		Content: string(jsonResult),
-	})
+	ollama.messages = append(ollama.messages, result.Message)
 	return result, err
 
 }
-func (ollama *Ollama) BindTools(tools []tools.Tool) LLm {
+func (ollama *Ollama) BindTools(tools []tools.Tool) llm.LLm {
 	if len(tools) == 0 {
 		return ollama
 	}

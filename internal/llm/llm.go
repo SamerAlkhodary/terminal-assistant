@@ -7,7 +7,7 @@ import (
 
 type LLm interface {
 	Stream(model.Message)
-	Invoke(model.Message) (map[string]any, error)
+	Invoke(model.Message) (model.Response, error)
 	BindTools(tools []tools.Tool) LLm
 	Tools() []tools.Tool
 	ToolDescriptions() map[string]string

@@ -49,7 +49,7 @@ func (a *Agent) Invoke(message model.Message) (string, error) {
 		Role:    "user",
 		Content: message.Content,
 	}
-	response := map[string]any{}
+	response := model.Response{}
 	var err error
 	for !ready {
 		response, err = a.llm.Invoke(inputMessage)
@@ -64,74 +64,26 @@ func (a *Agent) Invoke(message model.Message) (string, error) {
 		inputMessage.Role = "tool"
 
 	}
-	msg, ok := response["message"].(map[string]any)
-	if !ok {
-		return "", fmt.Errorf("message field missing or wrong type")
-	}
-	content, ok := msg["content"].(string)
-	if !ok {
-		return "", fmt.Errorf("content field missing or wrong type")
-	}
-	return content, nil
+	return response.Message.Content, nil
 }
 
-func (a *Agent) handleToolCalls(response map[string]any) (string, error) {
+func (a *Agent) handleToolCalls(response model.Response) (string, error) {
 	// Extract "message" map
-	message, ok := response["message"].(map[string]any)
-	if !ok {
-		return "", fmt.Errorf("message field missing or wrong type")
-	}
-
-	// Extract "tool_calls" slice
-	toolCallsRaw, ok := message["tool_calls"]
-	if !ok {
-		return "", fmt.Errorf("tool_calls field missing")
-	}
-
-	toolCalls, ok := toolCallsRaw.([]any)
-	if !ok {
-		return "", fmt.Errorf("tool_calls field wrong type")
-	}
 
 	// Iterate over tool calls, but only handle first valid one
-	for _, callRaw := range toolCalls {
-		call, ok := callRaw.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		funcMap, ok := call["function"].(map[string]any)
-		if !ok {
-			continue
-		}
-
-		toolName, ok := funcMap["name"].(string)
-		if !ok || toolName == "" {
-			continue
-		}
-
-		args, ok := funcMap["arguments"].(map[string]any)
-		if !ok {
-			continue
-		}
-
-		input, ok := args["input"].(string)
-		if !ok {
-			continue
-		}
+	for _, call := range response.Message.ToolCalls {
 
 		// Find the matching tool by name and call it
 		for _, tool := range a.tools {
-			if strings.EqualFold(tool.Name(), toolName) {
-				result, err := tool.Call(input)
+			if strings.EqualFold(tool.Name(), call.Function.Name) {
+				result, err := tool.Call(call.Function.Arguments.Input)
 				if err != nil {
-					return "", fmt.Errorf("error calling tool %s: %w", toolName, err)
+					return "", fmt.Errorf("error calling tool %s: %w", call.Function.Name, err)
 				}
 				return result, nil
 			}
 		}
 
-		return "", fmt.Errorf("tool %s not found", toolName)
 	}
 
 	return "", fmt.Errorf("no valid tool call found in response")

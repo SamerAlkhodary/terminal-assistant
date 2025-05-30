@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"com.terminal-assitant/assistant/internal/llm"
 	"com.terminal-assitant/assistant/internal/llm/model"
+	"com.terminal-assitant/assistant/internal/llm/ollama"
 	"com.terminal-assitant/assistant/internal/tools"
 )
 
@@ -29,7 +29,7 @@ The tool returns suggested commands or explanations to help the user perform the
 }
 
 func (t *CommandHelper) Call(input string) (string, error) {
-	llmClient := llm.NewOllama(os.Getenv("OLLAMA_URL"), os.Getenv("OLLAMA_MODEL"))
+	llmClient := ollama.NewOllama(os.Getenv("OLLAMA_URL"), os.Getenv("OLLAMA_MODEL"))
 	query := fmt.Sprintf(
 		"You are a bash command generator. Only output the exact bash command that answers the query, with no explanation, no quotes, no Markdown, and no formatting:\n\n%s",
 		input,
@@ -42,11 +42,8 @@ func (t *CommandHelper) Call(input string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	content, ok := resp["message"].(map[string]any)["content"].(string)
-	if !ok {
-		return "", fmt.Errorf("unexpected response format from LLM")
-	}
-	return content, nil
+
+	return resp.Message.Content, nil
 }
 
 func (t *CommandHelper) ToolParameters() []tools.ToolParameter {
