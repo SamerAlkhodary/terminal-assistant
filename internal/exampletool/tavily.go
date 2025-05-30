@@ -16,13 +16,12 @@ type Tavily struct {
 }
 
 func CreateTavilyTool() tools.Tool {
-	apiKey, _ := getAPIKey()
-	return &Tavily{
-		apiKey: apiKey,
-	}
+	tool := &Tavily{}
+	tool.setAPIKey()
+	return tool
 }
 func (t *Tavily) Name() string {
-	return "Tavily"
+	return "tavily"
 }
 func (t *Tavily) Description() string {
 	return `Tavily is a tool for answering questions that require up-to-date or web-based information.
@@ -61,12 +60,13 @@ func (t *Tavily) Call(input string) (string, error) {
 }
 
 // Helper to get the Tavily API key from the environment
-func getAPIKey() (string, error) {
+func (t *Tavily) setAPIKey() error {
 	apiKey := os.Getenv("TAVILY_API_KEY")
 	if apiKey == "" {
-		return "", fmt.Errorf("TAVILY_API_KEY environment variable not set")
+		return fmt.Errorf("TAVILY_API_KEY environment variable not set")
 	}
-	return apiKey, nil
+	t.apiKey = apiKey
+	return nil
 }
 
 // Helper to build the search request payload
